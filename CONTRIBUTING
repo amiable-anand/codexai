@@ -1,0 +1,225 @@
+# Contributing to CodexAI
+
+Thank you for your interest in contributing to CodexAI! This guide will help you get started.
+
+## Table of Contents
+
+- [Getting Started](#getting-started)
+- [Development Setup](#development-setup)
+- [Making Changes](#making-changes)
+- [Code Style](#code-style)
+- [Commit Convention](#commit-convention)
+- [Pull Request Process](#pull-request-process)
+- [Reporting Issues](#reporting-issues)
+
+---
+
+## Getting Started
+
+1. **Fork** the repository on GitHub
+2. **Clone** your fork locally:
+   ```bash
+   git clone https://github.com/<your-username>/codexai.git
+   cd codexai
+   ```
+3. **Add upstream** remote:
+   ```bash
+   git remote add upstream https://github.com/<original-owner>/codexai.git
+   ```
+4. **Create a branch** for your feature or fix:
+   ```bash
+   git checkout -b feat/your-feature-name
+   ```
+
+## Development Setup
+
+### Prerequisites
+
+- Python 3.9+
+- Node.js 18+
+- Azure CLI (for deployment testing)
+- Git
+
+### Install Dependencies
+
+```bash
+# CLI tool
+cd cli && pip install -r requirements.txt && cd ..
+
+# Backend
+cd backend && pip install -r requirements.txt && cd ..
+
+# Frontend
+cd frontend && npm install && cd ..
+```
+
+### Environment Configuration
+
+```bash
+cp .env.template .env
+# Fill in your Azure credentials (see README.md)
+```
+
+> ⚠️ **Never commit your `.env` file.** It is already in `.gitignore`.
+
+---
+
+## Making Changes
+
+1. Keep your branch up to date:
+   ```bash
+   git fetch upstream
+   git rebase upstream/main
+   ```
+2. Make your changes in small, focused commits
+3. Write or update tests as needed
+4. Ensure all tests pass before submitting
+
+### Running Tests
+
+```bash
+# Backend
+cd backend && pytest tests/ && cd ..
+
+# Frontend
+cd frontend && npm run test && cd ..
+```
+
+---
+
+## Code Style
+
+### Python (Backend & CLI)
+
+- Follow **PEP 8** style guidelines
+- Use **type hints** for function signatures
+- Write **docstrings** for all public functions and classes (Google style)
+- Maximum line length: **100 characters**
+- Use `black` for formatting (if available)
+
+```python
+def generate_documentation(project_id: str, file_path: str) -> dict:
+    """Generate documentation for a specific file.
+
+    Args:
+        project_id: The unique identifier of the project.
+        file_path: Relative path to the file within the project.
+
+    Returns:
+        A dictionary containing the generated documentation and metadata.
+
+    Raises:
+        ValueError: If the project_id or file_path is invalid.
+    """
+    ...
+```
+
+### TypeScript / React (Frontend)
+
+- Follow **ESLint** configuration in the project
+- Use **functional components** with hooks
+- Use **TypeScript** for all new files (no `.js` files)
+- Use **named exports** over default exports where possible
+- Component files: `PascalCase.tsx` (e.g., `FileExplorer.tsx`)
+- Utility files: `camelCase.ts` (e.g., `apiClient.ts`)
+
+---
+
+## Commit Convention
+
+We use **Conventional Commits** for clear and consistent commit messages.
+
+### Format
+
+```
+<type>(<scope>): <short description>
+
+[optional body]
+
+[optional footer]
+```
+
+### Types
+
+| Type       | Description                                      |
+|------------|--------------------------------------------------|
+| `feat`     | A new feature                                    |
+| `fix`      | A bug fix                                        |
+| `docs`     | Documentation changes only                       |
+| `style`    | Code style changes (formatting, no logic change) |
+| `refactor` | Code refactoring (no feature or fix)             |
+| `test`     | Adding or updating tests                         |
+| `chore`    | Build process, tooling, or dependency updates    |
+| `perf`     | Performance improvements                         |
+| `ci`       | CI/CD configuration changes                      |
+
+### Examples
+
+```
+feat(cli): add progress bar for file upload
+fix(backend): handle empty file during ingestion
+docs(readme): update Azure setup instructions
+refactor(frontend): extract FileTree into separate component
+test(backend): add unit tests for code chunker
+chore(deps): update azure-storage-blob to v12.19
+```
+
+---
+
+## Pull Request Process
+
+1. **Update your branch** with the latest changes from `main`
+2. **Push** your branch to your fork:
+   ```bash
+   git push origin feat/your-feature-name
+   ```
+3. **Open a Pull Request** against the `main` branch
+4. **Fill in the PR template** completely
+5. **Request a review** from a maintainer
+6. **Address feedback** promptly
+
+### PR Checklist
+
+- [ ] Code follows the project's style guidelines
+- [ ] Self-review of the code has been performed
+- [ ] Comments have been added for complex logic
+- [ ] Documentation has been updated (if applicable)
+- [ ] Tests have been added or updated
+- [ ] All tests pass locally
+- [ ] No new warnings are introduced
+- [ ] No secrets or credentials are included
+
+---
+
+## Reporting Issues
+
+### Bug Reports
+
+Use the **Bug Report** issue template and include:
+
+- Clear description of the bug
+- Steps to reproduce
+- Expected vs. actual behavior
+- Environment details (OS, Python version, Node version)
+- Screenshots or logs (if applicable)
+
+### Feature Requests
+
+Use the **Feature Request** issue template and include:
+
+- Problem description
+- Proposed solution
+- Alternative approaches considered
+- Additional context
+
+---
+
+## Questions?
+
+If you have questions about contributing, feel free to:
+
+- Open a **Discussion** on GitHub
+- Check existing **Issues** for similar topics
+- Review the **README.md** for project setup
+
+Thank you for helping make CodexAI better! 🚀

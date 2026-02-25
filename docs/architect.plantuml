@@ -1,0 +1,83 @@
+@startuml CodexAI Architecture
+!define AzurePuml https://raw.githubusercontent.com/plantuml-stdlib/Azure-PlantUML/release/2-2/dist
+!includeurl AzurePuml/AzureCommon.puml
+!includeurl AzurePuml/Compute/AzureAppService.puml
+!includeurl AzurePuml/Compute/AzureFunction.puml
+!includeurl AzurePuml/Databases/AzureCosmosDb.puml
+!includeurl AzurePuml/Storage/AzureBlobStorage.puml
+!includeurl AzurePuml/AI/AzureCognitiveSearch.puml
+!includeurl AzurePuml/AI/AzureOpenAI.puml
+
+skinparam componentStyle rectangle
+
+package "Client Layer" {
+    [CLI Tool\n(Python)] as CLI
+    [Web Browser] as Browser
+}
+
+package "Frontend - Azure App Service" {
+    AzureAppService(WebUI, "React Web UI", "Vite + TypeScript")
+}
+
+package "Backend - Azure Functions (Consumption Plan)" {
+    AzureFunction(UploadTrigger, "Blob Upload Trigger", "Python")
+    AzureFunction(IngestionFunc, "Ingestion Function", "Python")
+    AzureFunction(RAGFunc, "RAG Inference Function", "Python")
+    AzureFunction(APIFunc, "API Gateway Function", "HTTP Trigger")
+}
+
+package "Storage Layer" {
+    AzureBlobStorage(BlobStorage, "Blob Storage", "Code Archives")
+}
+
+package "Data Layer" {
+    AzureCosmosDb(CosmosDB, "Cosmos DB", "Metadata (Serverless)")
+    AzureCognitiveSearch(CogSearch, "Cognitive Search", "Vector Index (Basic Tier)")
+}
+
+package "AI Layer" {
+    AzureOpenAI(OpenAI, "Azure OpenAI", "text-embedding-ada-002\ngpt-4o-mini")
+}
+
+' Client interactions
+CLI --> BlobStorage : 1. Upload zipped codebase
+Browser --> WebUI : Access UI
+
+' Frontend to Backend
+WebUI --> APIFunc : 2. HTTP requests\n(list files, generate docs)
+
+' API Gateway routing
+APIFunc --> CosmosDB : Query metadata
+APIFunc --> RAGFunc : Trigger doc generation
+
+' Blob trigger flow
+BlobStorage --> UploadTrigger : 3. Blob created event
+UploadTrigger --> IngestionFunc : Trigger ingestion
+
+' Ingestion pipeline
+IngestionFunc --> BlobStorage : Read code files
+IngestionFunc --> OpenAI : 4. Generate embeddings\n(text-embedding-ada-002)
+IngestionFunc --> CogSearch : 5. Store vectors
+IngestionFunc --> CosmosDB : Store metadata
+
+' RAG inference flow
+RAGFunc --> CogSearch : 6. Vector search\n(find relevant context)
+RAGFunc --> CosmosDB : Fetch file metadata
+RAGFunc --> OpenAI : 7. Generate documentation\n(gpt-4o-mini + context)
+RAGFunc --> CosmosDB : Store generated docs
+
+note right of OpenAI
+  **Cost Optimization:**
+  - Limit context tokens
+  - Use gpt-4o-mini
+  - Cache embeddings
+end note
+
+note right of BlobStorage
+  **Security:**
+  - SAS tokens for uploads
+  - Private endpoints
+  - Environment variables
+end note
+
+@enduml

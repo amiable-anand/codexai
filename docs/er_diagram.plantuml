@@ -1,0 +1,124 @@
+@startuml CodexAI ER Diagram
+
+' Cosmos DB Collections
+entity "projects" as projects {
+  * id : string <<PK>>
+  * partition_key : string
+  --
+  * user_id : string
+  * name : string
+  * blob_name : string
+  * status : string
+  * upload_timestamp : datetime
+  file_count : int
+  total_size : int
+  indexed_at : datetime
+  metadata : object
+}
+
+entity "file_metadata" as files {
+  * id : string <<PK>>
+  * partition_key : string
+  --
+  * project_id : string <<FK>>
+  * file_path : string
+  * language : string
+  * size : int
+  * chunk_count : int
+  * has_documentation : bool
+  * last_updated : datetime
+  hash : string
+  imports : array
+  exports : array
+}
+
+entity "documentation" as docs {
+  * id : string <<PK>>
+  * partition_key : string
+  --
+  * project_id : string <<FK>>
+  * file_path : string
+  * content : string
+  * doc_type : string
+  * generated_at : datetime
+  * token_count : int
+  * cost : float
+  prompt_tokens : int
+  completion_tokens : int
+  context_files : array
+}
+
+entity "users" as users {
+  * id : string <<PK>>
+  * partition_key : string
+  --
+  * email : string
+  * created_at : datetime
+  subscription_tier : string
+  total_credits_used : float
+  last_login : datetime
+}
+
+' Azure Cognitive Search Index
+entity "code_chunks_index" as chunks {
+  * chunk_id : string <<PK>>
+  --
+  * project_id : string
+  * file_path : string
+  * content : string
+  * embedding : Collection(Edm.Single)
+  * start_line : int
+  * end_line : int
+  * chunk_type : string
+  * language : string
+  * indexed_at : datetime
+  function_name : string
+  class_name : string
+  imports : Collection(Edm.String)
+  complexity_score : int
+}
+
+' Relationships
+projects ||--o{ files : "projects.id -> files.project_id"
+projects ||--o{ docs : "projects.id -> docs.project_id"
+projects }o--|| users : "projects.user_id -> users.id"
+files ||--o| docs : "files.file_path -> docs.file_path"
+
+note right of projects
+  **Partition Key:** user_id
+  **Indexes:** 
+  - status
+  - upload_timestamp
+  **TTL:** None (persistent)
+end note
+
+note right of files
+  **Partition Key:** project_id
+  **Indexes:**
+  - file_path
+  - language
+  - has_documentation
+end note
+
+note right of docs
+  **Partition Key:** project_id
+  **Indexes:**
+  - file_path
+  - generated_at
+  - doc_type
+end note
+
+note right of chunks
+  **Vector Field:** embedding (1536 dimensions)
+  **Search Fields:** content, file_path
+  **Filterable:** project_id, language, chunk_type
+  **Facetable:** language, chunk_type
+end note
+
+note right of users
+  **Partition Key:** id
+  **Indexes:**
+  - email (unique)
+end note
+
+@enduml

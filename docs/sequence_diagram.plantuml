@@ -1,0 +1,425 @@
+@startuml CodexAI Sequence Diagram
+
+actor Developer
+participant "CLI Tool" as CLI
+participant "Azure Blob\nStorage" as Blob
+participant "Blob Upload\nTrigger" as Trigger
+participant "Ingestion\nFunction" as Ingestion
+participant "Azure OpenAI\n(Embeddings)" as Embeddings
+participant "Cognitive\nSearch" as Search
+participant "Cosmos DB" as Cosmos
+participant "Web UI" as UI
+participant "API Gateway\nFunction" as API
+participant "RAG Inference\nFunction" as RAG
+participant "Azure OpenAI\n(LLM)" as LLM
+
+== Code Upload Flow ==
+
+Developer -> CLI: Run upload command
+    note right
+        Input: {
+            "directory_path": "/path/to/code",
+            "project_name": "my-project"
+        }
+    end note
+
+CLI -> CLI: Filter files using .gitignore
+CLI -> CLI: Zip codebase
+CLI -> Blob: Upload zip file
+    note right
+        POST /upload
+        Input: {
+            "file": binary_data,
+            "blob_name": "project_123.zip",
+            "metadata": {
+                "project_name": "my-project",
+                "upload_timestamp": "2024-01-09T10:00:00Z"
+            }
+        }
+    end note
+
+Blob --> CLI: Upload confirmation
+    note right
+        Output: {
+            "blob_url": "https://...",
+            "blob_name": "project_123.zip",
+            "status": "uploaded"
+        }
+    end note
+
+CLI --> Developer: Upload successful
+
+== Ingestion Pipeline Flow ==
+
+Blob -> Trigger: Blob created event
+    note right
+        Event: {
+            "blob_name": "project_123.zip",
+            "blob_url": "https://...",
+            "size": 1048576
+        }
+    end note
+
+Trigger -> Cosmos: Create project record
+    note right
+        POST /projects
+        Input: {
+            "id": "proj_123",
+            "name": "my-project",
+            "blob_name": "project_123.zip",
+            "status": "processing",
+            "upload_timestamp": "2024-01-09T10:00:00Z"
+        }
+    end note
+
+Cosmos --> Trigger: Project created
+    note right
+        Output: {
+            "id": "proj_123",
+            "status": "created"
+        }
+    end note
+
+Trigger -> Ingestion: Trigger ingestion
+    note right
+        Input: {
+            "project_id": "proj_123",
+            "blob_name": "project_123.zip"
+        }
+    end note
+
+Ingestion -> Blob: Download and extract zip
+Blob --> Ingestion: Code files
+    note right
+        Output: [
+            {"path": "src/main.py", "content": "..."},
+            {"path": "src/utils.py", "content": "..."}
+        ]
+    end note
+
+loop For each code file
+    Ingestion -> Ingestion: Parse and chunk code
+        note right
+            Chunking Strategy:
+            - By function/class boundaries
+            - Max 500 tokens per chunk
+            - 50 token overlap
+            Output: [
+                {
+                    "chunk_id": "chunk_001",
+                    "content": "def main()...",
+                    "start_line": 1,
+                    "end_line": 25,
+                    "chunk_type": "function"
+                }
+            ]
+        end note
+    
+    Ingestion -> Embeddings: Generate embeddings
+        note right
+            POST /embeddings
+            Input: {
+                "input": ["def main()...", "class Utils..."],
+                "model": "text-embedding-ada-002"
+            }
+        end note
+    
+    Embeddings --> Ingestion: Vector embeddings
+        note right
+            Output: {
+                "data": [
+                    {"embedding": [0.123, -0.456, ...], "index": 0},
+                    {"embedding": [0.789, 0.234, ...], "index": 1}
+                ]
+            }
+        end note
+    
+    Ingestion -> Search: Index chunks with vectors
+        note right
+            POST /indexes/code-chunks/docs
+            Input: {
+                "value": [
+                    {
+                        "chunk_id": "chunk_001",
+                        "project_id": "proj_123",
+                        "file_path": "src/main.py",
+                        "content": "def main()...",
+                        "embedding": [0.123, -0.456, ...],
+                        "chunk_type": "function",
+                        "language": "python"
+                    }
+                ]
+            }
+        end note
+    
+    Search --> Ingestion: Indexing successful
+        note right
+            Output: {
+                "status": "success",
+                "indexed_count": 1
+            }
+        end note
+    
+    Ingestion -> Cosmos: Store file metadata
+        note right
+            POST /file_metadata
+            Input: {
+                "id": "file_001",
+                "project_id": "proj_123",
+                "file_path": "src/main.py",
+                "language": "python",
+                "chunk_count": 5,
+                "size": 2048
+            }
+        end note
+    
+    Cosmos --> Ingestion: Metadata stored
+end
+
+Ingestion -> Cosmos: Update project status
+    note right
+        PATCH /projects/proj_123
+        Input: {
+            "status": "indexed",
+            "file_count": 10,
+            "total_size": 51200
+        }
+    end note
+
+Cosmos --> Ingestion: Status updated
+
+== Documentation Generation Flow ==
+
+Developer -> UI: Access web interface
+UI -> API: List projects
+    note right
+        GET /api/projects
+    end note
+
+API -> Cosmos: Query projects
+Cosmos --> API: Project list
+    note right
+        Output: [
+            {
+                "id": "proj_123",
+                "name": "my-project",
+                "status": "indexed",
+                "file_count": 10
+            }
+        ]
+    end note
+
+API --> UI: Return projects
+UI --> Developer: Display projects
+
+Developer -> UI: Select project
+UI -> API: Get project files
+    note right
+        GET /api/projects/proj_123/files
+    end note
+
+API -> Cosmos: Query file metadata
+Cosmos --> API: File list
+    note right
+        Output: [
+            {
+                "file_path": "src/main.py",
+                "language": "python",
+                "chunk_count": 5,
+                "has_documentation": false
+            }
+        ]
+    end note
+
+API --> UI: Return files
+UI --> Developer: Display file tree
+
+Developer -> UI: Click "Generate Documentation"
+    note right
+        User selects:
+        - File: src/main.py
+        - Doc type: API Reference
+    end note
+
+UI -> API: Request documentation generation
+    note right
+        POST /api/generate-docs
+        Input: {
+            "project_id": "proj_123",
+            "file_path": "src/main.py",
+            "doc_type": "api_reference",
+            "include_tests": true,
+            "include_dependencies": true
+        }
+    end note
+
+API -> RAG: Trigger RAG inference
+    note right
+        Input: {
+            "project_id": "proj_123",
+            "file_path": "src/main.py",
+            "doc_type": "api_reference"
+        }
+    end note
+
+RAG -> Cosmos: Fetch file content
+Cosmos --> RAG: File metadata and content
+    note right
+        Output: {
+            "file_path": "src/main.py",
+            "content": "def main()...",
+            "language": "python"
+        }
+    end note
+
+RAG -> Embeddings: Generate query embedding
+    note right
+        POST /embeddings
+        Input: {
+            "input": "Generate API documentation for main.py",
+            "model": "text-embedding-ada-002"
+        }
+    end note
+
+Embeddings --> RAG: Query vector
+    note right
+        Output: {
+            "embedding": [0.234, -0.567, ...]
+        }
+    end note
+
+RAG -> Search: Vector search for context
+    note right
+        POST /indexes/code-chunks/docs/search
+        Input: {
+            "vector": [0.234, -0.567, ...],
+            "top": 10,
+            "filter": "project_id eq 'proj_123'",
+            "select": "chunk_id,file_path,content,chunk_type"
+        }
+    end note
+
+Search --> RAG: Relevant code chunks
+    note right
+        Output: {
+            "value": [
+                {
+                    "chunk_id": "chunk_005",
+                    "file_path": "src/utils.py",
+                    "content": "class Utils...",
+                    "score": 0.89
+                },
+                {
+                    "chunk_id": "chunk_012",
+                    "file_path": "tests/test_main.py",
+                    "content": "def test_main()...",
+                    "score": 0.85
+                }
+            ]
+        }
+    end note
+
+RAG -> RAG: Build augmented prompt
+    note right
+        Prompt Structure:
+        """
+        You are a technical documentation expert.
+        
+        Target File: src/main.py
+        Content:
+        ```python
+        [file content]
+        ```
+        
+        Related Context:
+        1. Dependencies (from src/utils.py):
+        ```python
+        [relevant code]
+        ```
+        
+        2. Tests (from tests/test_main.py):
+        ```python
+        [relevant code]
+        ```
+        
+        Generate comprehensive API documentation
+        in Markdown format including:
+        - Function signatures
+        - Parameters and return types
+        - Usage examples
+        - Related functions
+        """
+        
+        Token limit: 4000 tokens
+    end note
+
+RAG -> LLM: Generate documentation
+    note right
+        POST /chat/completions
+        Input: {
+            "model": "gpt-4o-mini",
+            "messages": [
+                {"role": "system", "content": "..."},
+                {"role": "user", "content": "[augmented prompt]"}
+            ],
+            "max_tokens": 2000,
+            "temperature": 0.3
+        }
+    end note
+
+LLM --> RAG: Generated documentation
+    note right
+        Output: {
+            "choices": [
+                {
+                    "message": {
+                        "content": "# API Reference: main.py\n\n## main()\n..."
+                    }
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 1500,
+                "completion_tokens": 800,
+                "total_tokens": 2300
+            }
+        }
+    end note
+
+RAG -> Cosmos: Save documentation
+    note right
+        POST /documentation
+        Input: {
+            "id": "doc_001",
+            "project_id": "proj_123",
+            "file_path": "src/main.py",
+            "content": "# API Reference: main.py...",
+            "doc_type": "api_reference",
+            "token_count": 2300,
+            "cost": 0.0023,
+            "generated_at": "2024-01-09T10:05:00Z"
+        }
+    end note
+
+Cosmos --> RAG: Documentation saved
+
+RAG --> API: Documentation ready
+    note right
+        Output: {
+            "status": "completed",
+            "documentation_id": "doc_001",
+            "token_count": 2300,
+            "cost": 0.0023
+        }
+    end note
+
+API --> UI: Return documentation
+    note right
+        Output: {
+            "content": "# API Reference: main.py...",
+            "generated_at": "2024-01-09T10:05:00Z"
+        }
+    end note
+
+UI --> Developer: Display documentation
+
+@enduml
