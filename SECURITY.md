@@ -13,7 +13,7 @@ We take the security of CodexAI seriously. If you discover a security vulnerabil
 ### How to Report
 
 1. **Do NOT** open a public GitHub issue for security vulnerabilities
-2. Email your report to **[INSERT SECURITY EMAIL]**
+2. Email your report to **[work.anand19@gmail.com]**
 3. Include the following details:
    - Description of the vulnerability
    - Steps to reproduce
